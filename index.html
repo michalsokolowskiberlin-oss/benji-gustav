@@ -171,6 +171,9 @@
    👇 HIER kannst du personalisieren:
 */
 
+// Name der Beschenkten — für die Begrüßung beim allerersten Start:
+const HER_NAME = "Fanny";
+
 // Kleine Überraschungsnachrichten — einmal am Tag taucht ein 💌 auf.
 // Trag hier eigene Sätze ein (einfach Zeilen ersetzen oder ergänzen):
 const NOTES = [
@@ -277,7 +280,7 @@ const KEY = "benji-gustav-v1";
 const freshDog = () => ({ food: 82, fun: 82, energy: 92, sick: false, lowH: 0 });
 let state = {
   v: 1, created: 0, lastTick: Date.now(),
-  muted: false, lightsOff: false,
+  muted: false, lightsOff: false, iosSoundHint: false,
   streak: { count: 0, best: 0, lastDay: "" },
   unlocked: [], lastNoteDay: "", lastSpecialDay: "",
   poops: [], // [{x}]
@@ -341,25 +344,46 @@ function applyOffline() {
 
 /* ---------- Sound ---------- */
 let AC = null;
-function beep(freq, dur = 0.07, type = "square", vol = 0.04, when = 0) {
-  if (state.muted) return;
-  try {
-    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
-    if (AC.state === "suspended") AC.resume();
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, AC.currentTime + when);
-    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + when + dur);
-    o.connect(g).connect(AC.destination);
-    o.start(AC.currentTime + when); o.stop(AC.currentTime + when + dur + 0.02);
-  } catch (e) {}
+const IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function ensureAC() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+  return AC;
 }
+function beep(freq, dur = 0.07, type = "square", vol = 0.07, when = 0) {
+  if (state.muted) return;
+  const ac = ensureAC();
+  if (!ac) return;
+  if (IS_IOS && !state.iosSoundHint) {
+    state.iosSoundHint = true;
+    toast("Kein Ton? Prüf den Stummschalter am Handy 🔔", 3500);
+    save();
+  }
+  const play = () => {
+    try {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = freq;
+      const t0 = ac.currentTime + when;
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(ac.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    } catch (e) {}
+  };
+  if (ac.state === "suspended") ac.resume().then(play).catch(() => {});
+  else play();
+}
+// Audio mit der allerersten Berührung entsperren (Autoplay-Regel der Browser)
+document.addEventListener("pointerdown", () => { if (!state.muted) ensureAC(); }, { once: true, capture: true });
 const sfx = {
-  tap: () => beep(660, 0.05),
-  bark: () => { beep(180, 0.06, "square", 0.06); beep(140, 0.08, "square", 0.06, 0.09); },
-  eat: () => { beep(330, 0.05); beep(290, 0.05, "square", 0.04, 0.12); },
-  happy: () => { beep(523, 0.07); beep(659, 0.07, "square", 0.04, 0.09); beep(784, 0.1, "square", 0.04, 0.18); },
-  chime: () => { beep(880, 0.12, "sine", 0.05); beep(1175, 0.18, "sine", 0.05, 0.13); },
+  tap: () => beep(660, 0.05, "square", 0.07),
+  bark: () => { beep(330, 0.07, "square", 0.12); beep(245, 0.1, "square", 0.12, 0.1); },
+  eat: () => { beep(392, 0.05, "square", 0.09); beep(330, 0.05, "square", 0.08, 0.12); },
+  happy: () => { beep(523, 0.07, "square", 0.08); beep(659, 0.07, "square", 0.08, 0.09); beep(784, 0.1, "square", 0.08, 0.18); },
+  chime: () => { beep(880, 0.12, "sine", 0.1); beep(1175, 0.18, "sine", 0.1, 0.13); },
 };
 
 /* ---------- Szene / Rendering ---------- */
@@ -848,7 +872,8 @@ function start() {
   if (!storageOk) toast("⚠️ Hinweis: Spielstand kann nicht gespeichert werden (privater Modus?)", 5000);
 
   if (!state.created) {
-    modal("🐶🐶", "Wuff! Wir sind Benji & Gustav!",
+    modal("🐶🐶",
+      HER_NAME ? "Hallo " + HER_NAME + "! Wir sind Benji & Gustav!" : "Wuff! Wir sind Benji & Gustav!",
       "Passt du auf uns auf?\n\nFüttere uns, spiel mit uns, mach sauber — und schau am besten jeden Tag kurz vorbei. Wir freuen uns immer riesig auf dich!",
       "Los geht's! ❤️",
       () => {
