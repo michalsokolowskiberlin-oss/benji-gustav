@@ -28,6 +28,9 @@ streicheln, Häufchen wegmachen — und wer jeden Tag vorbeischaut, schaltet
 - **Tages-Streak 🔥**: Jeden Tag öffnen = Serie. Belohnungen: Tag 3 Halstücher 🧣,
   Tag 7 Schleifen 🎀, Tag 14 Sonnenbrillen 🕶️, Tag 30 Kronen 👑.
 - **💌-Nachricht**: Einmal am Tag wartet eine kleine Überraschungsnachricht.
+- **Sanfte Hintergrundmusik 🎵**: ruhiger Ambient-Teppich im Tempo langsamer
+  Atmung (~6 Atemzüge/Min), direkt im Browser erzeugt (keine Audiodatei).
+  Per 🎵-Knopf an/aus; wird automatisch leiser, wenn das Licht aus ist.
 
 ## Selbst ausprobieren
 
