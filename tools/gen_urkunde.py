@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Erzeugt die Adoptionsurkunde (PDF, A4) mit QR-Code zur App.
 
-Aufruf:  tools/.venv/bin/python tools/gen_urkunde.py
+Aufruf:  tools/.venv/bin/python tools/gen_urkunde.py [adoptiert-von] [übergeben-von] [datum]
+         (ohne Argumente bleiben die Linien zum Handschrift-Ausfüllen leer)
 Output:  Adoptionsurkunde.pdf im Projektordner
 """
-import os, struct, zlib, tempfile
+import os, struct, sys, zlib, tempfile
 
 import segno
 from reportlab.lib.colors import Color, HexColor
@@ -17,6 +18,11 @@ from reportlab.pdfgen import canvas
 URL = "https://michalsokolowskiberlin-oss.github.io/benji-gustav/"
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(HERE, "Adoptionsurkunde.pdf")
+
+# Optional vorausgefüllt (per Kommandozeile):
+ADOPTED_BY = sys.argv[1] if len(sys.argv) > 1 else ""
+GIVEN_BY = sys.argv[2] if len(sys.argv) > 2 else ""
+DATE_TEXT = sys.argv[3] if len(sys.argv) > 3 else ""
 
 # ---------- Pixel-Hunde (identisch zur App) ----------
 PAL = {
@@ -117,6 +123,25 @@ def setup_fonts():
     if ok:
         return "Urkunde", "Urkunde-Bold", "Urkunde-Italic"
     return "Times-Roman", "Times-Bold", "Times-Italic"
+
+
+def setup_script_font(fallback):
+    """Schreibschrift für die 'Unterschriften' — mit Fallback-Kette."""
+    base = "/System/Library/Fonts/Supplemental"
+    for path, idx in [
+        (f"{base}/Snell Roundhand.ttc", 0),
+        (f"{base}/Apple Chancery.ttf", None),
+    ]:
+        if os.path.exists(path):
+            try:
+                if idx is None:
+                    pdfmetrics.registerFont(TTFont("Schreibschrift", path))
+                else:
+                    pdfmetrics.registerFont(TTFont("Schreibschrift", path, subfontIndex=idx))
+                return "Schreibschrift"
+            except Exception:
+                continue
+    return fallback
 
 
 # ---------- Zeichnen ----------
@@ -262,18 +287,31 @@ def main():
     c.drawCentredString(W / 2, box_y + 14, "deine Hunde ziehen bei dir ein")
 
     # Unterschriften
+    script = setup_script_font(serif_i)
     sig_y = 104
     c.setStrokeColor(DARK)
     c.setLineWidth(0.8)
     c.line(86, sig_y, 266, sig_y)
     c.line(W - 266, sig_y, W - 86, sig_y)
+    if ADOPTED_BY:
+        c.setFont(script, 22)
+        c.setFillColor(DARK)
+        c.drawCentredString(176, sig_y + 7, ADOPTED_BY)
+    if GIVEN_BY:
+        c.setFont(script, 22)
+        c.setFillColor(DARK)
+        c.drawCentredString(W - 176, sig_y + 7, GIVEN_BY)
     c.setFont(serif_i, 9.5)
     c.setFillColor(SOFT)
     c.drawCentredString(176, sig_y - 14, "adoptiert von")
     c.drawCentredString(W - 176, sig_y - 14, "mit Liebe übergeben von")
-    c.setFont(serif, 10.5)
     c.setFillColor(DARK)
-    c.drawCentredString(W / 2, 64, "Datum: ____________________")
+    if DATE_TEXT:
+        c.setFont(serif, 10.5)
+        c.drawCentredString(W / 2, 64, "Datum: " + DATE_TEXT)
+    else:
+        c.setFont(serif, 10.5)
+        c.drawCentredString(W / 2, 64, "Datum: ____________________")
 
     # Fußzeile
     c.setFont(serif_i, 8)
